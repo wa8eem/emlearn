@@ -8,6 +8,7 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.ensemble import ExtraTreesClassifier, ExtraTreesRegressor
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 
+from emlearn.preprocessing import Quantizer
 import emlearn
 import pytest
 
@@ -43,6 +44,7 @@ METHODS = ['pymodule', 'loadable', 'inline']
 def test_trees_sklearn_classifier_predict(data, model, method):
     X, y = CLASSIFICATION_DATASETS[data]
     estimator = CLASSIFICATION_MODELS[model]
+    X = Quantizer().fit_transform(X)
 
     estimator.fit(X, y)
     cmodel = emlearn.convert(estimator, method=method)
@@ -58,6 +60,7 @@ def test_trees_sklearn_classifier_predict(data, model, method):
 def test_trees_sklearn_regressor_predict(data, model, method):
     X, y = REGRESSION_DATASETS[data]
     estimator = REGRESSION_MODELS[model]
+    X = Quantizer().fit_transform(X)
 
     estimator.fit(X, y)
     cmodel = emlearn.convert(estimator, method=method)

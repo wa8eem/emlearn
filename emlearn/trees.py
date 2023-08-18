@@ -396,13 +396,34 @@ class Wrapper:
 
         elif classifier == 'loadable':
             name = 'mytree'
+            model_init = self.save(name=name)
 
             if self.is_classifier:
-                func = 'eml_trees_predict(&{}, values, length)'.format(name)
+                func = 'eml_trees_predict'
             else:
-                func = 'eml_trees_regress1(&{}, values, length)'.format(name)
-            code = self.save(name=name)
-            self.classifier_ = common.CompiledClassifier(code, name=name, call=func, out_dtype=out_dtype)
+                func = 'eml_trees_regress1'
+
+            n_features = estimator.n_features_in_
+
+            code = '\n'.join([
+                model_init,
+
+                # Wrapper that is compatible with CompilerClassifier
+                f"""
+                int32_t
+                predict_func(const float *values, int length) {{
+                    // Convert to integer
+                    int16_t features[{n_features}];
+                    for (int i=0; i<length; i++) {{
+                        features[i] = (int16_t)values[i];
+                    }}
+                    const int out = {func}(&{name}, features, length);
+                    return out;
+                }}
+                """
+            ])
+            call_func = 'predict_func(values, length)'
+            self.classifier_ = common.CompiledClassifier(code, name=name, call=call_func, out_dtype=out_dtype)
         elif classifier == 'inline':
             name = 'myinlinetree'
             func = '{}_predict(values, length)'.format(name)
