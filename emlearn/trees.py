@@ -592,24 +592,17 @@ class Wrapper:
         self.n_classes = 0
         if self.is_classifier:
             self.n_classes = estimators[0].n_classes_
+        self.method = classifier
+        if self.method not in ('loadable', 'inline'):
+            raise ValueError("Unsupported classifier method '{}'".format(classifier))
 
+        self._classifier = None
 
-        if classifier == 'pymodule':
-            # FIXME: use Nodes,Roots directly, as Numpy Array
-            import eml_trees # import when required
-            nodes, roots, leaves = self.forest_
-            node_data = []
-            for node in nodes:
-                assert len(node) == 4
-                node_data += node
-            assert len(node_data) % 4 == 0
+    def _build_classifier(self):
+        if self._classifier is not None:
+            return None
 
-            assert type(roots) == list
-            leaf_bytes = leaves_to_bytelist(leaves, leaf_bits=self.leaf_bits)
-            self.classifier_ = eml_trees.Classifier(node_data, roots, leaf_bytes,
-                self.leaf_bits, self.n_classes, self.n_features)
-
-        elif classifier == 'loadable':
+        if method == 'loadable':
             name = 'mytree'
             proba_func = 'eml_trees_predict_proba(&{}, values, length, outputs, N_CLASSES)'\
                 .format(name, self.n_classes)
@@ -621,7 +614,7 @@ class Wrapper:
             code = self.save(name=name)
             self.classifier_ = common.CompiledClassifier(code, name=name,
                 call=func, proba_call=proba_func, out_dtype=out_dtype, n_classes=self.n_classes)
-        elif classifier == 'inline':
+        elif method == 'inline':
             name = 'myinlinetree'
             # TODO: actually implement inline predict_proba, instead of just using loadable
             proba_func = 'eml_trees_predict_proba(&{}, values, length, outputs, N_CLASSES)'\
@@ -631,9 +624,12 @@ class Wrapper:
             self.classifier_ = common.CompiledClassifier(code, name=name,
                 call=func, proba_call=proba_func, out_dtype=out_dtype, n_classes=self.n_classes)
         else:
-            raise ValueError("Unsupported classifier method '{}'".format(classifier))
+            assert False, 'should not happen, constructor should enforce'
+
 
     def predict(self, X):
+        self._build_classifier()
+
         if self.is_classifier:
             predictions = self.classifier_.predict(X)
         else:
@@ -642,6 +638,8 @@ class Wrapper:
         return predictions
 
     def predict_proba(self, X):
+        self._build_classifier()
+
         if not self.is_classifier:
             raise ValueError(f"Cannot call predict_proba on a Regressor")
         
